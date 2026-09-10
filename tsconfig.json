@@ -1,0 +1,28 @@
+{
+	"compilerOptions": {
+		"target": "ES2022",
+		"lib": ["DOM", "DOM.Iterable", "ES2022"],
+		"module": "ESNext",
+
+		"rootDir": "./src",
+		"outDir": "./dist",
+
+		"strict": true,
+		"noImplicitAny": true,
+		"strictNullChecks": true,
+
+		"sourceMap": true,
+		"skipLibCheck": true,
+
+		"paths": {
+			"e@engine/*": ["./src/engine/*"],
+			"e@types/*": ["./src/engine/types/*"],
+			"e@config/*": ["./src/engine/config/*"],
+			"e@canvas/*": ["./src/engine/canvas/*"],
+			"e@loader/*": ["./src/engine/loader/*"],
+			"e@controller/*": ["./src/engine/controller/*"]
+		}
+	},
+	"include": ["src/**/*"],
+	"exclude": ["node_modules", "dist"]
+}

@@ -1,0 +1,11 @@
+{
+	"name": "theryn",
+	"type": "module",
+	"private": true,
+	"scripts": {
+		"dev": "tsc -w"
+	},
+	"devDependencies": {
+		"typescript": "^7.0.2"
+	}
+}
