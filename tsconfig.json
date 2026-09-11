@@ -15,12 +15,18 @@
 		"skipLibCheck": true,
 
 		"paths": {
+			// Engine
 			"e@engine/*": ["./src/engine/*"],
 			"e@types/*": ["./src/engine/types/*"],
 			"e@config/*": ["./src/engine/config/*"],
 			"e@canvas/*": ["./src/engine/canvas/*"],
 			"e@loader/*": ["./src/engine/loader/*"],
-			"e@controller/*": ["./src/engine/controller/*"]
+			"e@controller/*": ["./src/engine/controller/*"],
+
+			// Game
+			"g@game/*": ["./src/game/*"],
+			"g@assets/*": ["./src/game/assets/*"],
+			"g@scenes/*": ["./src/game/scenes/*"]
 		}
 	},
 	"include": ["src/**/*"],

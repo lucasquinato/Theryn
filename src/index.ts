@@ -14,3 +14,5 @@ await Theryn.loader.loadTileset(DecorationTileset);
 import { HanaSpriteSheet } from "./game/assets/characters/Hana.js";
 
 await Theryn.loader.loadSpritesheet(HanaSpriteSheet);
+
+await import("g@game/Game.js");
