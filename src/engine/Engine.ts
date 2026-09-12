@@ -7,15 +7,26 @@ import { Camera } from "e@camera/Camera.js";
 import { CanvasManager } from "e@canvas/CanvasManager.js";
 import { SceneManager } from "e@controller/scene/SceneManager.js";
 import { ECSManagerInstance } from "e@ecs/ECSManager.js";
+import { InputManager } from "e@input/InputManager.js";
 import { LoaderManagerInstance } from "e@loader/LoaderManager.js";
 import { RenderQueue } from "e@render/RenderQueue.js";
 
 import type { Theryn } from "e@types/global.d.ts";
 
 /**
+ * Shared canvas manager used by the engine runtime.
+ */
+const canvasManager = new CanvasManager();
+
+/**
  * Shared render queue used by every rendering system in the engine runtime.
  */
 const renderQueue = new RenderQueue();
+
+/**
+ * Shared input manager connected to the primary application canvas.
+ */
+const inputManager = new InputManager(canvasManager.getCanvas("main").element);
 
 /**
  * Public API exposed by the Theryntile engine.
@@ -35,7 +46,7 @@ const TherynAPI: Theryn = {
 	 * Canvas subsystem used to create, store, and retrieve application
 	 * canvases.
 	 */
-	canvas: new CanvasManager(),
+	canvas: canvasManager,
 
 	/**
 	 * Shared loader subsystem used to load and resolve engine resources.
@@ -54,14 +65,19 @@ const TherynAPI: Theryn = {
 	renderQueue,
 
 	/**
+	 * Shared input subsystem used to access device-specific input state.
+	 */
+	input: inputManager,
+
+	/**
 	 * Scene subsystem responsible for scene lifecycle and engine loop
 	 * coordination.
 	 *
-	 * The same ECS and render queue instances exposed publicly through the
-	 * Theryn API are injected into the SceneManager so frame execution operates
-	 * against one shared runtime.
+	 * The same ECS, render queue, and input instances exposed publicly through
+	 * the Theryn API are injected into the SceneManager so frame execution
+	 * operates against one shared runtime.
 	 */
-	scene: new SceneManager(ECSManagerInstance, renderQueue),
+	scene: new SceneManager(ECSManagerInstance, renderQueue, inputManager),
 };
 
 /**

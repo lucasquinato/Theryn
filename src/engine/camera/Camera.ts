@@ -4,24 +4,36 @@
  */
 
 /**
- * Represents a two-dimensional camera used to transform world coordinates
- * into screen coordinates.
+ * Represents a two-dimensional coordinate.
+ */
+export interface CameraPosition {
+	/**
+	 * Horizontal coordinate.
+	 */
+	readonly x: number;
+
+	/**
+	 * Vertical coordinate.
+	 */
+	readonly y: number;
+}
+
+/**
+ * Controls the transformation between world-space and screen-space
+ * coordinates.
  *
- * The camera position represents the world-space point that should appear at
- * the center of the viewport.
- *
- * The camera is intentionally independent from maps, grids, isometric
- * projection, canvases, and ECS entities. Rendering systems are responsible
- * for providing world-space coordinates and the current viewport dimensions.
+ * The camera stores a world-space position representing the center of the
+ * viewport, along with the logical viewport dimensions and zoom level used
+ * during coordinate conversion.
  */
 export class Camera {
 	/**
-	 * Horizontal world-space position currently centered by the camera.
+	 * Horizontal world-space position at the center of the viewport.
 	 */
 	private positionX = 0;
 
 	/**
-	 * Vertical world-space position currently centered by the camera.
+	 * Vertical world-space position at the center of the viewport.
 	 */
 	private positionY = 0;
 
@@ -31,42 +43,41 @@ export class Camera {
 	private zoom = 1;
 
 	/**
-	 * Width of the current viewport in logical pixels.
+	 * Logical viewport width used for coordinate transformations.
 	 */
-	private viewportWidth = 0;
+	private viewportWidth = 1;
 
 	/**
-	 * Height of the current viewport in logical pixels.
+	 * Logical viewport height used for coordinate transformations.
 	 */
-	private viewportHeight = 0;
+	private viewportHeight = 1;
 
 	/**
-	 * Returns the horizontal world-space position centered by the camera.
+	 * Current horizontal world-space camera position.
 	 */
 	public get x(): number {
 		return this.positionX;
 	}
 
 	/**
-	 * Returns the vertical world-space position centered by the camera.
+	 * Current vertical world-space camera position.
 	 */
 	public get y(): number {
 		return this.positionY;
 	}
 
 	/**
-	 * Returns the current camera zoom multiplier.
+	 * Current camera zoom multiplier.
 	 */
 	public get scale(): number {
 		return this.zoom;
 	}
 
 	/**
-	 * Sets the world-space point that should appear at the center of the
-	 * viewport.
+	 * Moves the camera center to a world-space position.
 	 *
-	 * @param x - Horizontal world-space camera position.
-	 * @param y - Vertical world-space camera position.
+	 * @param x - Horizontal world-space coordinate.
+	 * @param y - Vertical world-space coordinate.
 	 */
 	public setPosition(x: number, y: number): void {
 		this.positionX = x;
@@ -74,15 +85,15 @@ export class Camera {
 	}
 
 	/**
-	 * Sets the camera zoom multiplier.
+	 * Changes the camera zoom multiplier.
 	 *
 	 * @param zoom - Positive zoom multiplier.
 	 *
-	 * @throws {RangeError} If the provided zoom is not greater than zero.
+	 * @throws {RangeError} If the zoom is not greater than zero.
 	 */
 	public setZoom(zoom: number): void {
 		if (zoom <= 0) {
-			throw new RangeError("Camera zoom must be greater than zero.");
+			throw new RangeError(`Camera zoom must be greater than zero. Received: ${zoom}.`);
 		}
 
 		this.zoom = zoom;
@@ -91,14 +102,17 @@ export class Camera {
 	/**
 	 * Updates the logical viewport dimensions used by camera transformations.
 	 *
-	 * @param width - Viewport width in logical pixels.
-	 * @param height - Viewport height in logical pixels.
+	 * @param width - Logical viewport width.
+	 * @param height - Logical viewport height.
 	 *
-	 * @throws {RangeError} If either dimension is not greater than zero.
+	 * @throws {RangeError} If either viewport dimension is not greater than
+	 * zero.
 	 */
 	public setViewport(width: number, height: number): void {
 		if (width <= 0 || height <= 0) {
-			throw new RangeError("Camera viewport dimensions must be greater than zero.");
+			throw new RangeError(
+				`Camera viewport dimensions must be greater than zero. Received: ${width}x${height}.`,
+			);
 		}
 
 		this.viewportWidth = width;
@@ -106,28 +120,40 @@ export class Camera {
 	}
 
 	/**
-	 * Converts a world-space coordinate into screen-space coordinates.
+	 * Converts world-space coordinates into logical screen-space coordinates.
 	 *
-	 * The camera position is treated as the center of the viewport. World
-	 * coordinates are translated relative to that position, scaled by the
-	 * current zoom, and then offset to the viewport center.
+	 * The camera position represents the world-space point displayed at the
+	 * center of the viewport. Zoom is applied relative to that center.
 	 *
 	 * @param x - Horizontal world-space coordinate.
 	 * @param y - Vertical world-space coordinate.
 	 *
-	 * @returns The corresponding screen-space coordinate.
-	 *
-	 * @throws {Error} If the camera viewport has not been configured.
+	 * @returns The corresponding logical screen-space position.
 	 */
-	public worldToScreen(x: number, y: number): { readonly x: number; readonly y: number } {
-		if (this.viewportWidth <= 0 || this.viewportHeight <= 0) {
-			throw new Error("Camera viewport must be configured before transforming coordinates.");
-		}
-
+	public worldToScreen(x: number, y: number): CameraPosition {
 		return {
 			x: (x - this.positionX) * this.zoom + this.viewportWidth / 2,
-
 			y: (y - this.positionY) * this.zoom + this.viewportHeight / 2,
+		};
+	}
+
+	/**
+	 * Converts logical screen-space coordinates into world-space coordinates.
+	 *
+	 * This operation is the mathematical inverse of `worldToScreen()`.
+	 * Screen coordinates are first translated relative to the viewport center,
+	 * then corrected for camera zoom and finally offset by the camera's
+	 * world-space position.
+	 *
+	 * @param x - Horizontal logical screen-space coordinate.
+	 * @param y - Vertical logical screen-space coordinate.
+	 *
+	 * @returns The corresponding world-space position.
+	 */
+	public screenToWorld(x: number, y: number): CameraPosition {
+		return {
+			x: (x - this.viewportWidth / 2) / this.zoom + this.positionX,
+			y: (y - this.viewportHeight / 2) / this.zoom + this.positionY,
 		};
 	}
 }

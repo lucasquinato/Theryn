@@ -30,7 +30,7 @@ export class Lobby extends Scene {
 	/**
 	 * Elapsed time used by the temporary scene transition test.
 	 */
-	private elapsedTime = 0;
+	// private elapsedTime = 0;
 
 	/**
 	 * Creates the lobby scene.
@@ -46,7 +46,7 @@ export class Lobby extends Scene {
 	 * instantiated inside the shared ECS runtime.
 	 */
 	public override enter(): void {
-		this.elapsedTime = 0;
+		// this.elapsedTime = 0;
 		this.map.load();
 	}
 
@@ -68,11 +68,11 @@ export class Lobby extends Scene {
 	 *
 	 * @param deltaTime - Time elapsed since the previous frame, in seconds.
 	 */
-	public override update(deltaTime: number): void {
-		this.elapsedTime += deltaTime;
+	// public override update(deltaTime: number): void {
+	// 	this.elapsedTime += deltaTime;
 
-		if (this.elapsedTime >= 10) {
-			Theryn.scene.change(SceneData.forest.name);
-		}
-	}
+	// 	if (this.elapsedTime >= 10) {
+	// 		Theryn.scene.change(SceneData.forest.name);
+	// 	}
+	// }
 }

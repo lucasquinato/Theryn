@@ -7,6 +7,7 @@ import type { Camera } from "e@camera/Camera.js";
 import type { CanvasManager } from "e@canvas/CanvasManager.js";
 import type { SceneManager } from "e@controller/scene/SceneManager.js";
 import type { ECSManager } from "e@ecs/ECSManager.js";
+import type { InputManager } from "e@input/InputManager.js";
 import type { LoaderManager } from "e@loader/LoaderManager.js";
 import type { RenderQueue } from "e@render/RenderQueue.js";
 
@@ -53,6 +54,14 @@ export interface Theryn {
 	 * commands and executing them using deterministic grid-based ordering.
 	 */
 	readonly renderQueue: RenderQueue;
+
+	/**
+	 * Input subsystem responsible for exposing device-specific input state.
+	 *
+	 * Mouse input is currently available. Additional input sources may be
+	 * exposed through the same manager as they are implemented.
+	 */
+	readonly input: InputManager;
 }
 
 /**

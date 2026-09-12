@@ -5,8 +5,8 @@
 
 import { LoopController } from "e@controller/LoopController.js";
 import { Scene } from "e@controller/scene/Scene.js";
-
 import type { ECSManager } from "e@ecs/ECSManager.js";
+import type { InputManager } from "e@input/InputManager.js";
 import type { RenderQueue } from "e@render/RenderQueue.js";
 
 /**
@@ -20,6 +20,10 @@ import type { RenderQueue } from "e@render/RenderQueue.js";
  * The manager also coordinates the shared render queue. Rendering operations
  * submitted by scenes and ECS systems during a frame are collected first and
  * executed only after every render producer has completed.
+ *
+ * Input state collected during the frame remains available throughout both
+ * update and render execution and is finalized only after the complete frame
+ * has finished.
  */
 export class SceneManager {
 	/**
@@ -44,6 +48,12 @@ export class SceneManager {
 	private readonly renderQueue: RenderQueue;
 
 	/**
+	 * Shared input subsystem whose transient device state is finalized after
+	 * every completed engine frame.
+	 */
+	private readonly input: InputManager;
+
+	/**
 	 * Scene currently active in the engine.
 	 */
 	private activeScene: Scene | null = null;
@@ -58,10 +68,12 @@ export class SceneManager {
 	 *
 	 * @param ecs - Shared ECS runtime used by registered scenes.
 	 * @param renderQueue - Shared render queue used during frame rendering.
+	 * @param input - Shared input subsystem finalized after each frame.
 	 */
-	public constructor(ecs: ECSManager, renderQueue: RenderQueue) {
+	public constructor(ecs: ECSManager, renderQueue: RenderQueue, input: InputManager) {
 		this.ecs = ecs;
 		this.renderQueue = renderQueue;
+		this.input = input;
 	}
 
 	/**
@@ -103,7 +115,6 @@ export class SceneManager {
 	 */
 	public change(name: string): void {
 		const nextScene = this.scenes.get(name);
-
 		if (!nextScene) {
 			throw new Error(`Scene '${name}' is not registered.`);
 		}
@@ -121,7 +132,6 @@ export class SceneManager {
 		}
 
 		this.activeScene = nextScene;
-
 		for (const system of this.activeScene.getSystems()) {
 			this.ecs.enableSystem(system);
 		}
@@ -150,6 +160,7 @@ export class SceneManager {
 		this.loopController.start((deltaTime) => {
 			this.update(deltaTime);
 			this.render();
+			this.input.endFrame();
 		});
 	}
 
@@ -183,10 +194,8 @@ export class SceneManager {
 		}
 
 		this.renderQueue.clear();
-
 		this.activeScene.render();
 		this.ecs.render();
-
 		this.renderQueue.flush();
 	}
 }
