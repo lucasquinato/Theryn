@@ -18,6 +18,8 @@ import { HoverState } from "g@interaction/HoverState.js";
 
 import { Tiles } from "g@tiles/data/Tiles.js";
 
+import { InteractionConfig } from "g@config/InteractionConfig.js";
+
 import { HoverSystem } from "g@systems/HoverSystem.js";
 import { RenderMapSystem } from "g@systems/RenderMapSystem.js";
 import { AnimationSystem } from "g@systems/AnimationSystem.js";
@@ -40,13 +42,15 @@ Theryn.ecs.registerSystem(new AnimationSystem(Theryn.ecs, Theryn.loader));
 
 Theryn.ecs.registerSystem(new CameraFollowSystem(Theryn.ecs, Theryn.camera, projection));
 
-Theryn.ecs.registerSystem(new CameraZoomSystem(Theryn.input.mouse, Theryn.camera));
+Theryn.ecs.registerSystem(
+	new CameraZoomSystem(Theryn.input.mouse, Theryn.camera, InteractionConfig.cameraZoom),
+);
 
 Theryn.ecs.registerSystem(
 	new HoverSystem(Theryn.ecs, Theryn.input.mouse, Theryn.camera, projection, Tiles, hover),
 );
 
-Theryn.ecs.registerSystem(new HoverEffectSystem(hover));
+Theryn.ecs.registerSystem(new HoverEffectSystem(hover, InteractionConfig.hover));
 
 Theryn.ecs.registerSystem(
 	new RenderMapSystem(
@@ -72,7 +76,14 @@ Theryn.ecs.registerSystem(
 );
 
 Theryn.ecs.registerSystem(
-	new RenderHoverSystem(canvas, Theryn.camera, Theryn.renderQueue, projection, hover),
+	new RenderHoverSystem(
+		canvas,
+		Theryn.camera,
+		Theryn.renderQueue,
+		projection,
+		hover,
+		InteractionConfig.hover,
+	),
 );
 
 const player = Theryn.ecs.createEntity();

@@ -4,6 +4,8 @@
  */
 
 import { System } from "e@ecs/System.js";
+
+import type { HoverEffectConfig } from "g@config/InteractionConfig.js";
 import type { HoverState } from "g@interaction/HoverState.js";
 
 /**
@@ -22,39 +24,18 @@ export class HoverEffectSystem extends System {
 	 */
 	private readonly hover: HoverState;
 
-	/**
-	 * Maximum normalized opacity reached by the active highlight.
-	 */
-	private readonly maximumAlpha = 1;
-
-	/**
-	 * Maximum vertical world-space lift applied to the active tile.
-	 */
-	private readonly maximumLift = 4;
-
-	/**
-	 * Responsiveness used by the fade interpolation.
-	 */
-	private readonly fadeSpeed = 14;
-
-	/**
-	 * Responsiveness used by the vertical lift interpolation.
-	 */
-	private readonly liftSpeed = 16;
-
-	/**
-	 * Threshold below which an animation value is considered settled.
-	 */
-	private readonly epsilon = 0.01;
+	private readonly config: HoverEffectConfig;
 
 	/**
 	 * Creates the hover visual effect system.
 	 *
 	 * @param hover - Shared hover state to animate.
 	 */
-	public constructor(hover: HoverState) {
+	public constructor(hover: HoverState, config: HoverEffectConfig) {
 		super("update", "required");
+
 		this.hover = hover;
+		this.config = config;
 	}
 
 	/**
@@ -77,12 +58,22 @@ export class HoverEffectSystem extends System {
 			return;
 		}
 
-		const alpha = this.approach(this.hover.alpha, this.maximumAlpha, this.fadeSpeed, deltaTime);
-		const lift = this.approach(this.hover.lift, this.maximumLift, this.liftSpeed, deltaTime);
+		const alpha = this.approach(
+			this.hover.alpha,
+			this.config.maximumAlpha,
+			this.config.fadeSpeed,
+			deltaTime,
+		);
+		const lift = this.approach(
+			this.hover.lift,
+			this.config.maximumLift,
+			this.config.liftSpeed,
+			deltaTime,
+		);
 
 		this.hover.updateCurrentVisual(
-			this.snap(alpha, this.maximumAlpha),
-			this.snap(lift, this.maximumLift),
+			this.snap(alpha, this.config.maximumAlpha),
+			this.snap(lift, this.config.maximumLift),
 		);
 	}
 
@@ -99,8 +90,13 @@ export class HoverEffectSystem extends System {
 			return;
 		}
 
-		const alpha = this.approach(this.hover.previousOpacity, 0, this.fadeSpeed, deltaTime);
-		const lift = this.approach(this.hover.previousOffset, 0, this.liftSpeed, deltaTime);
+		const alpha = this.approach(
+			this.hover.previousOpacity,
+			0,
+			this.config.fadeSpeed,
+			deltaTime,
+		);
+		const lift = this.approach(this.hover.previousOffset, 0, this.config.liftSpeed, deltaTime);
 
 		const settledAlpha = this.snap(alpha, 0);
 		const settledLift = this.snap(lift, 0);
@@ -141,7 +137,7 @@ export class HoverEffectSystem extends System {
 	 * original value.
 	 */
 	private snap(value: number, target: number): number {
-		if (Math.abs(target - value) <= this.epsilon) {
+		if (Math.abs(target - value) <= this.config.epsilon) {
 			return target;
 		}
 

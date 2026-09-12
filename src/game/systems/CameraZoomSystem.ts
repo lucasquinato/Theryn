@@ -3,9 +3,12 @@
  * Path: src/game/systems/
  */
 
-import type { Camera } from "e@camera/Camera.js";
 import { System } from "e@ecs/System.js";
+
+import type { Camera } from "e@camera/Camera.js";
 import type { MouseInput } from "e@input/mouse/MouseInput.js";
+
+import type { CameraZoomConfig } from "g@config/InteractionConfig.js";
 
 /**
  * Controls camera zoom through vertical mouse wheel input.
@@ -28,20 +31,7 @@ export class CameraZoomSystem extends System {
 	 */
 	private readonly camera: Camera;
 
-	/**
-	 * Minimum allowed camera zoom multiplier.
-	 */
-	private readonly minimumZoom = 1;
-
-	/**
-	 * Maximum allowed camera zoom multiplier.
-	 */
-	private readonly maximumZoom = 5;
-
-	/**
-	 * Zoom amount applied for each detected wheel direction change.
-	 */
-	private readonly zoomStep = 0.25;
+	private readonly config: CameraZoomConfig;
 
 	/**
 	 * Creates the camera zoom system.
@@ -49,11 +39,12 @@ export class CameraZoomSystem extends System {
 	 * @param mouse - Mouse input source.
 	 * @param camera - Shared camera whose zoom level will be modified.
 	 */
-	public constructor(mouse: MouseInput, camera: Camera) {
+	public constructor(mouse: MouseInput, camera: Camera, config: CameraZoomConfig) {
 		super("update", "required");
 
 		this.mouse = mouse;
 		this.camera = camera;
+		this.config = config;
 	}
 
 	/**
@@ -69,9 +60,9 @@ export class CameraZoomSystem extends System {
 		const direction = wheelY < 0 ? 1 : -1;
 
 		const nextZoom = this.clamp(
-			this.camera.scale + direction * this.zoomStep,
-			this.minimumZoom,
-			this.maximumZoom,
+			this.camera.scale + direction * this.config.zoomStep,
+			this.config.minimumZoom,
+			this.config.maximumZoom,
 		);
 
 		if (nextZoom === this.camera.scale) {

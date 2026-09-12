@@ -11,6 +11,8 @@ import type { RenderQueue } from "e@render/RenderQueue.js";
 
 import type { HoverState } from "g@interaction/HoverState.js";
 
+import type { HoverEffectConfig } from "g@config/InteractionConfig.js";
+
 import type { IsometricProjection } from "g@render/IsometricProjection.js";
 
 /**
@@ -58,10 +60,7 @@ export class RenderHoverSystem extends System {
 	 */
 	private readonly highlightOrder = 5;
 
-	/**
-	 * Maximum visual opacity applied when the normalized hover alpha reaches 1.
-	 */
-	private readonly maximumOpacity = 0.25;
+	private readonly config: HoverEffectConfig;
 
 	/**
 	 * Creates the required hover rendering system.
@@ -78,6 +77,7 @@ export class RenderHoverSystem extends System {
 		renderQueue: RenderQueue,
 		projection: IsometricProjection,
 		hover: HoverState,
+		config: HoverEffectConfig,
 	) {
 		super("render", "required");
 
@@ -86,6 +86,7 @@ export class RenderHoverSystem extends System {
 		this.renderQueue = renderQueue;
 		this.projection = projection;
 		this.hover = hover;
+		this.config = config;
 	}
 
 	/**
@@ -149,7 +150,7 @@ export class RenderHoverSystem extends System {
 		const centerX = screenPosition.x + width / 2;
 		const centerY = screenPosition.y + height / 2;
 
-		const opacity = this.maximumOpacity * Math.min(1, Math.max(0, alpha));
+		const opacity = this.config.maximumOpacity * Math.min(1, Math.max(0, alpha));
 
 		this.renderQueue.submit({
 			row,
@@ -164,12 +165,18 @@ export class RenderHoverSystem extends System {
 				context.beginPath();
 
 				context.moveTo(centerX, screenPosition.y);
+
 				context.lineTo(screenPosition.x + width, centerY);
+
 				context.lineTo(centerX, screenPosition.y + height);
+
 				context.lineTo(screenPosition.x, centerY);
+
 				context.closePath();
 
-				context.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+				context.fillStyle = this.config.color;
+
+				context.globalAlpha = opacity;
 
 				context.fill();
 
