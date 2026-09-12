@@ -33,7 +33,8 @@
 			"g@maps/*": ["./src/game/maps/*"],
 			"g@scenes/*": ["./src/game/scenes/*"],
 			"g@render/*": ["./src/game/render/*"],
-			"g@systems/*": ["./src/game/systems/*"]
+			"g@systems/*": ["./src/game/systems/*"],
+			"g@tiles/*": ["./src/game/tiles/*"]
 		}
 	},
 	"include": ["src/**/*"],
