@@ -28,6 +28,9 @@ import type { TileRegistry } from "g@tiles/TileRegistry.js";
  * Tiles outside layer zero are never interactive regardless of their gameplay
  * definition. Occupied cells are also excluded even when their layer-zero tile
  * would otherwise be walkable.
+ *
+ * The browser cursor reflects logical interaction immediately and is
+ * independent from visual hover animations.
  */
 export class HoverSystem extends System {
 	/**
@@ -57,7 +60,7 @@ export class HoverSystem extends System {
 	private readonly tiles: TileRegistry;
 
 	/**
-	 * Shared state containing the currently hovered tile.
+	 * Shared state containing the current and previous tile hover states.
 	 */
 	private readonly hover: HoverState;
 
@@ -91,23 +94,41 @@ export class HoverSystem extends System {
 
 	/**
 	 * Resolves the currently hovered interactive layer-zero tile.
+	 *
+	 * Logical hover state changes immediately. Visual transition values are
+	 * preserved by HoverState and updated independently by HoverEffectSystem.
 	 */
 	public override update(): void {
 		if (!this.mouse.inside) {
-			this.hover.clear();
+			this.clearHover();
 			return;
 		}
 
 		const world = this.camera.screenToWorld(this.mouse.x, this.mouse.y);
+
 		const grid = this.projection.toGrid(world.x, world.y);
 
 		const entity = this.resolveInteractiveEntity(grid.row, grid.column);
+
 		if (entity === null) {
-			this.hover.clear();
+			this.clearHover();
 			return;
 		}
 
 		this.hover.set(entity, grid.row, grid.column);
+
+		this.updateCursor(true);
+	}
+
+	/**
+	 * Removes the current logical hover and restores the default cursor.
+	 *
+	 * HoverState preserves the previous tile when necessary so visual exit
+	 * effects may continue after logical interaction has ended.
+	 */
+	private clearHover(): void {
+		this.hover.clear();
+		this.updateCursor(false);
 	}
 
 	/**
@@ -116,6 +137,9 @@ export class HoverSystem extends System {
 	 * Interaction requires exactly one entity at the target position. The
 	 * entity must also contain a Tile component, belong to layer zero, and be
 	 * registered as walkable.
+	 *
+	 * Any additional entity sharing the same GridPosition makes the cell
+	 * non-interactive, regardless of that entity's component composition.
 	 *
 	 * @param row - Target logical grid row.
 	 * @param column - Target logical grid column.
@@ -127,6 +151,7 @@ export class HoverSystem extends System {
 		const entities = this.ecs.query(GridPosition);
 
 		let candidate: Entity | null = null;
+
 		let occupancy = 0;
 
 		for (const entity of entities) {
@@ -136,6 +161,7 @@ export class HoverSystem extends System {
 			}
 
 			occupancy++;
+
 			if (occupancy > 1) {
 				return null;
 			}
@@ -152,11 +178,23 @@ export class HoverSystem extends System {
 			return null;
 		}
 
-		const definition = this.tiles.get(tile.id);
+		const definition = this.tiles.get(tile.id)!;
 		if (!definition.walkable) {
 			return null;
 		}
 
 		return candidate;
+	}
+
+	/**
+	 * Updates the browser cursor according to tile interactivity.
+	 *
+	 * Cursor state follows logical hover immediately and does not wait for
+	 * visual fade or lift animations to complete.
+	 *
+	 * @param interactive - Whether an interactive tile is currently hovered.
+	 */
+	private updateCursor(interactive: boolean): void {
+		document.body.style.cursor = interactive ? "pointer" : "default";
 	}
 }

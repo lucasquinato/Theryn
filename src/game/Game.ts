@@ -21,6 +21,8 @@ import { Tiles } from "g@tiles/data/Tiles.js";
 import { HoverSystem } from "g@systems/HoverSystem.js";
 import { RenderMapSystem } from "g@systems/RenderMapSystem.js";
 import { AnimationSystem } from "g@systems/AnimationSystem.js";
+import { CameraZoomSystem } from "g@systems/CameraZoomSystem.js";
+import { HoverEffectSystem } from "g@systems/HoverEffectSystem.js";
 import { RenderHoverSystem } from "g@systems/RenderHoverSystem.js";
 import { CameraFollowSystem } from "g@systems/CameraFollowSystem.js";
 import { RenderCharacterSystem } from "g@systems/RenderCharacterSystem.js";
@@ -38,6 +40,14 @@ Theryn.ecs.registerSystem(new AnimationSystem(Theryn.ecs, Theryn.loader));
 
 Theryn.ecs.registerSystem(new CameraFollowSystem(Theryn.ecs, Theryn.camera, projection));
 
+Theryn.ecs.registerSystem(new CameraZoomSystem(Theryn.input.mouse, Theryn.camera));
+
+Theryn.ecs.registerSystem(
+	new HoverSystem(Theryn.ecs, Theryn.input.mouse, Theryn.camera, projection, Tiles, hover),
+);
+
+Theryn.ecs.registerSystem(new HoverEffectSystem(hover));
+
 Theryn.ecs.registerSystem(
 	new RenderMapSystem(
 		Theryn.ecs,
@@ -46,6 +56,7 @@ Theryn.ecs.registerSystem(
 		Theryn.camera,
 		Theryn.renderQueue,
 		projection,
+		hover,
 	),
 );
 
@@ -61,21 +72,14 @@ Theryn.ecs.registerSystem(
 );
 
 Theryn.ecs.registerSystem(
-	new HoverSystem(Theryn.ecs, Theryn.input.mouse, Theryn.camera, projection, Tiles, hover),
-);
-
-Theryn.ecs.registerSystem(
 	new RenderHoverSystem(canvas, Theryn.camera, Theryn.renderQueue, projection, hover),
 );
 
 const player = Theryn.ecs.createEntity();
 
 Theryn.ecs.addComponent(player, new Player());
-
 Theryn.ecs.addComponent(player, new GridPosition(3, 3));
-
 Theryn.ecs.addComponent(player, new Sprite("hana", 10, 0, 10));
-
 Theryn.ecs.addComponent(player, new Animator("idle", "rightDown"));
 
 Theryn.scene.change(SceneData.lobby.name);

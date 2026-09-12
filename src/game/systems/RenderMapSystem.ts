@@ -3,17 +3,16 @@
  * Path: src/game/systems/
  */
 
-import { System } from "e@ecs/System.js";
-
 import type { Camera } from "e@camera/Camera.js";
 import type { Canvas } from "e@canvas/Canvas.js";
 import type { ECSManager } from "e@ecs/ECSManager.js";
+import type { Entity } from "e@ecs/Entity.js";
+import { System } from "e@ecs/System.js";
 import type { LoaderManager } from "e@loader/LoaderManager.js";
 import type { RenderQueue } from "e@render/RenderQueue.js";
-
 import { GridPosition } from "g@components/GridPosition.js";
 import { Tile } from "g@components/Tile.js";
-
+import type { HoverState } from "g@interaction/HoverState.js";
 import type { IsometricProjection } from "g@render/IsometricProjection.js";
 
 /**
@@ -25,11 +24,16 @@ import type { IsometricProjection } from "g@render/IsometricProjection.js";
  * the shared RenderQueue.
  *
  * Tile rendering order is determined exclusively by GridPosition through the
- * RenderQueue. Map layers and visual texture dimensions do not participate in
- * global render ordering.
+ * RenderQueue. Map layers, hover displacement, and visual texture dimensions
+ * do not participate in global render ordering.
+ *
+ * Interactive tiles may receive a temporary vertical visual displacement from
+ * the shared hover state. This displacement affects only rendering and never
+ * changes the tile's logical grid position.
  *
  * Camera position and zoom are intentionally controlled outside this system.
- * The map renderer consumes the current camera state without modifying it.
+ * The map renderer consumes the current camera state without modifying it,
+ * except for synchronizing the viewport with the current canvas dimensions.
  *
  * This system is required because map rendering remains registered across
  * scene transitions. Whether there are tiles to render depends entirely on the
@@ -68,6 +72,11 @@ export class RenderMapSystem extends System {
 	private readonly projection: IsometricProjection;
 
 	/**
+	 * Shared hover state used to resolve temporary visual tile displacement.
+	 */
+	private readonly hover: HoverState;
+
+	/**
 	 * Local render order assigned to map tiles.
 	 *
 	 * The value only participates in ordering when another command occupies the
@@ -84,6 +93,7 @@ export class RenderMapSystem extends System {
 	 * @param camera - Shared camera used for world-to-screen transformation.
 	 * @param renderQueue - Shared queue used for grid-based render ordering.
 	 * @param projection - Shared isometric grid projection.
+	 * @param hover - Shared hover state used for visual tile displacement.
 	 */
 	public constructor(
 		ecs: ECSManager,
@@ -92,6 +102,7 @@ export class RenderMapSystem extends System {
 		camera: Camera,
 		renderQueue: RenderQueue,
 		projection: IsometricProjection,
+		hover: HoverState,
 	) {
 		super("render", "required");
 
@@ -101,6 +112,7 @@ export class RenderMapSystem extends System {
 		this.camera = camera;
 		this.renderQueue = renderQueue;
 		this.projection = projection;
+		this.hover = hover;
 	}
 
 	/**
@@ -113,13 +125,13 @@ export class RenderMapSystem extends System {
 		const context = this.canvas.context2D;
 		const canvas = this.canvas.element;
 
-		/*
+		/**
 		 * Frame clearing remains temporarily owned by the map renderer until a
 		 * dedicated frame-level canvas coordinator becomes necessary.
 		 */
 		context.clearRect(0, 0, canvas.width, canvas.height);
 
-		/*
+		/**
 		 * The viewport depends on the current logical canvas buffer dimensions
 		 * and must remain synchronized with responsive canvas resizing.
 		 */
@@ -135,18 +147,20 @@ export class RenderMapSystem extends System {
 			}
 
 			const region = this.loader.get(tile.id);
-
 			const worldPosition = this.projection.toWorld(position.row, position.column);
 
-			/*
-			 * Map layers currently modify only the tile's visual vertical
-			 * position. They never participate in RenderQueue ordering.
+			/**
+			 * Map layers modify only the tile's visual vertical position. Hover
+			 * displacement is applied independently and likewise never affects
+			 * logical grid placement or RenderQueue ordering.
 			 */
 			const layerOffsetY = this.projection.getLayerOffsetY(tile.layer);
 
+			const hoverLift = this.getHoverLift(entity);
+
 			const screenPosition = this.camera.worldToScreen(
 				worldPosition.x,
-				worldPosition.y - layerOffsetY,
+				worldPosition.y - layerOffsetY - hoverLift,
 			);
 
 			const destinationWidth = region.width * this.camera.scale;
@@ -172,5 +186,29 @@ export class RenderMapSystem extends System {
 				},
 			});
 		}
+	}
+
+	/**
+	 * Resolves the temporary vertical displacement applied to a tile by the
+	 * hover animation.
+	 *
+	 * The current hovered tile rises toward the active hover offset. The
+	 * previously hovered tile retains its own offset while completing the exit
+	 * animation. Every other tile remains at its normal rendered position.
+	 *
+	 * @param entity - Tile entity being rendered.
+	 *
+	 * @returns Vertical world-space displacement applied to the tile.
+	 */
+	private getHoverLift(entity: Entity): number {
+		if (this.hover.entity === entity) {
+			return this.hover.lift;
+		}
+
+		if (this.hover.previous === entity) {
+			return this.hover.previousOffset;
+		}
+
+		return 0;
 	}
 }
