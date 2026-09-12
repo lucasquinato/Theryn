@@ -5,7 +5,7 @@
 
 import { ClientConfig } from "e@config/ClientConfig.js";
 
-import { Canvas, type CanvasResolution, type CanvasOptions } from "e@canvas/Canvas.js";
+import { Canvas, type CanvasOptions, type CanvasResolution } from "e@canvas/Canvas.js";
 
 /**
  * Options used to initialize the CanvasManager.
@@ -30,13 +30,18 @@ export interface CreateCanvasOptions {
 }
 
 /**
- * Manages the creation, registration, and retrieval of application canvases.
+ * Manages the creation, registration, retrieval, and resizing of application
+ * canvases.
  *
- * Each canvas is identified by a unique name, which is also assigned
- * as the DOM ID of the underlying canvas element.
+ * Each canvas is identified by a unique name, which is also assigned as the
+ * DOM ID of the underlying canvas element.
  *
  * The client configuration is used as the default source for canvas
  * resolution when no custom resolution is provided.
+ *
+ * The manager also coordinates browser resize events so all registered
+ * canvases adapt their internal buffers to the currently available display
+ * area.
  */
 export class CanvasManager {
 	/**
@@ -56,8 +61,14 @@ export class CanvasManager {
 	 *
 	 * @param options - Canvas manager initialization options.
 	 */
-	public constructor(options: CanvasManagerOptions = { createDefaultCanvas: true }) {
+	public constructor(
+		options: CanvasManagerOptions = {
+			createDefaultCanvas: true,
+		},
+	) {
 		document.title = this.title;
+
+		window.addEventListener("resize", this.handleResize);
 
 		if (options.createDefaultCanvas) {
 			this.createCanvas("main");
@@ -67,11 +78,14 @@ export class CanvasManager {
 	/**
 	 * Creates and registers a new canvas.
 	 *
-	 * The provided name is used both as the registry key and as the
-	 * DOM ID assigned to the underlying canvas element.
+	 * The provided name is used both as the registry key and as the DOM ID
+	 * assigned to the underlying canvas element.
 	 *
-	 * When no resolution is provided, the default resolution defined
-	 * in ClientConfig is used.
+	 * When no resolution is provided, the default resolution defined in
+	 * ClientConfig is used.
+	 *
+	 * The newly created canvas is immediately resized to match the currently
+	 * available browser area.
 	 *
 	 * @param name - Unique name used to identify the canvas.
 	 * @param params - Optional canvas creation parameters.
@@ -87,9 +101,9 @@ export class CanvasManager {
 
 		const canvasParams: CanvasOptions = {
 			canvasID: name,
-
 			resolution: {
 				width: params?.resolution?.width ?? ClientConfig.canvas.resolution.width,
+
 				height: params?.resolution?.height ?? ClientConfig.canvas.resolution.height,
 			},
 		};
@@ -97,6 +111,8 @@ export class CanvasManager {
 		const canvas = new Canvas(canvasParams);
 
 		this.canvases.set(name, canvas);
+
+		this.resizeCanvas(canvas);
 
 		return canvas;
 	}
@@ -122,5 +138,33 @@ export class CanvasManager {
 		}
 
 		return canvas;
+	}
+
+	/**
+	 * Handles browser resize events.
+	 *
+	 * Every registered canvas is resized to match the currently available
+	 * browser area.
+	 */
+	private readonly handleResize = (): void => {
+		for (const canvas of this.canvases.values()) {
+			this.resizeCanvas(canvas);
+		}
+	};
+
+	/**
+	 * Resizes one canvas using the dimensions of its configured parent element.
+	 *
+	 * @param canvas - Canvas to resize.
+	 *
+	 * @throws {Error} If the configured parent element cannot be found.
+	 */
+	private resizeCanvas(canvas: Canvas): void {
+		const parentElement = document.getElementById(ClientConfig.canvas.parentID);
+		if (!parentElement) {
+			throw new Error(`Parent element with ID '${ClientConfig.canvas.parentID}' not found.`);
+		}
+
+		canvas.resizeToAvailableArea(parentElement.clientWidth, parentElement.clientHeight);
 	}
 }
