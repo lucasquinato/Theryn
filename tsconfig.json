@@ -34,6 +34,7 @@
 			"g@config/*": ["./src/game/config/*"],
 			"g@interaction/*": ["./src/game/interaction/*"],
 			"g@maps/*": ["./src/game/maps/*"],
+			"g@navigation/*": ["./src/game/navigation/*"],
 			"g@scenes/*": ["./src/game/scenes/*"],
 			"g@render/*": ["./src/game/render/*"],
 			"g@systems/*": ["./src/game/systems/*"],

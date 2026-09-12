@@ -5,53 +5,47 @@
 
 import { System } from "e@ecs/System.js";
 
+import { Animator } from "g@components/Animator.js";
+import { GridPosition } from "g@components/GridPosition.js";
+import { Sprite } from "g@components/Sprite.js";
+import { WorldPosition } from "g@components/WorldPosition.js";
+
 import type { Camera } from "e@camera/Camera.js";
 import type { Canvas } from "e@canvas/Canvas.js";
 import type { ECSManager } from "e@ecs/ECSManager.js";
 import type { LoaderManager } from "e@loader/LoaderManager.js";
 import type { RenderQueue } from "e@render/RenderQueue.js";
 
-import { Animator } from "g@components/Animator.js";
-import { GridPosition } from "g@components/GridPosition.js";
-import { Sprite } from "g@components/Sprite.js";
-
-import type { IsometricProjection } from "g@render/IsometricProjection.js";
-
 /**
- * Renders animated character entities using the shared isometric projection.
+ * Renders animated character entities using their continuous world-space
+ * position while preserving logical grid ordering.
  *
- * The system queries entities containing GridPosition, Sprite, and Animator
- * components, resolves the currently active animation frame, transforms the
- * entity's logical grid position into screen space, and submits a deferred
- * drawing operation to the shared RenderQueue.
+ * WorldPosition determines where the sprite is visually drawn. GridPosition
+ * remains responsible for RenderQueue ordering so smooth interpolation never
+ * replaces the entity's logical grid ownership.
  *
- * Characters use the center of their logical grid cell as their world anchor.
- * Their sprite is drawn horizontally centered on that anchor and vertically
- * aligned by its bottom edge so the character's feet remain attached to the
- * logical cell position.
- *
- * Rendering order remains entirely grid-based. Sprite dimensions, animation
- * frame dimensions, and screen-space coordinates never participate in the
- * RenderQueue ordering contract.
+ * Animation frame selection is resolved from the static TextureAnimation
+ * metadata provided by the loader and the current frame index stored in the
+ * Animator component.
  */
 export class RenderCharacterSystem extends System {
 	/**
-	 * Shared ECS runtime containing renderable character entities.
+	 * Shared ECS runtime containing character entities.
 	 */
 	private readonly ecs: ECSManager;
 
 	/**
-	 * Resource loader used to resolve animation metadata.
+	 * Resource loader used to resolve character animation metadata.
 	 */
 	private readonly loader: LoaderManager;
 
 	/**
-	 * Canvas receiving the final character drawing operations.
+	 * Canvas receiving character drawing operations.
 	 */
 	private readonly canvas: Canvas;
 
 	/**
-	 * Camera used to transform character world coordinates into screen space.
+	 * Camera used to transform world-space positions into screen-space.
 	 */
 	private readonly camera: Camera;
 
@@ -61,20 +55,13 @@ export class RenderCharacterSystem extends System {
 	private readonly renderQueue: RenderQueue;
 
 	/**
-	 * Shared isometric projection used to convert grid coordinates into world
-	 * coordinates.
-	 */
-	private readonly projection: IsometricProjection;
-
-	/**
 	 * Creates the required character rendering system.
 	 *
 	 * @param ecs - Shared ECS runtime containing character entities.
-	 * @param loader - Resource loader used to resolve animation metadata.
+	 * @param loader - Resource loader used to resolve character animations.
 	 * @param canvas - Canvas used to render characters.
 	 * @param camera - Shared camera used for world-to-screen transformation.
-	 * @param renderQueue - Shared queue used for grid-based render ordering.
-	 * @param projection - Shared isometric grid projection.
+	 * @param renderQueue - Shared deferred rendering queue.
 	 */
 	public constructor(
 		ecs: ECSManager,
@@ -82,7 +69,6 @@ export class RenderCharacterSystem extends System {
 		canvas: Canvas,
 		camera: Camera,
 		renderQueue: RenderQueue,
-		projection: IsometricProjection,
 	) {
 		super("render", "required");
 
@@ -91,28 +77,24 @@ export class RenderCharacterSystem extends System {
 		this.canvas = canvas;
 		this.camera = camera;
 		this.renderQueue = renderQueue;
-		this.projection = projection;
 	}
 
 	/**
-	 * Resolves and submits the current animation frame for every renderable
-	 * character entity.
+	 * Submits every animated character to the shared render queue.
 	 *
-	 * Actual drawing is deferred until the RenderQueue is flushed by the frame
-	 * coordinator.
+	 * Character drawing uses WorldPosition for smooth visual placement while
+	 * GridPosition continues to define deterministic grid-based render order.
 	 */
 	public override render(): void {
 		const context = this.canvas.context2D;
 
-		const entities = this.ecs.query(GridPosition, Sprite, Animator);
+		const entities = this.ecs.query(GridPosition, WorldPosition, Sprite, Animator);
 
 		for (const entity of entities) {
-			const position = this.ecs.getComponent(entity, GridPosition);
-			const sprite = this.ecs.getComponent(entity, Sprite);
-			const animator = this.ecs.getComponent(entity, Animator);
-			if (!position || !sprite || !animator) {
-				continue;
-			}
+			const gridPosition = this.ecs.getComponent(entity, GridPosition)!;
+			const worldPosition = this.ecs.getComponent(entity, WorldPosition)!;
+			const sprite = this.ecs.getComponent(entity, Sprite)!;
+			const animator = this.ecs.getComponent(entity, Animator)!;
 
 			const animation = this.loader.getAnimation(
 				sprite.textureKey,
@@ -120,38 +102,30 @@ export class RenderCharacterSystem extends System {
 				animator.sequenceName,
 			);
 
-			/*
-			 * Animator frame indices are expected to remain inside the resolved
-			 * sequence. AnimationSystem maintains this invariant while playback
-			 * is active.
-			 */
-			const frameColumn = animation.fromColumn + animator.frameIndex;
-
-			const sourceX = frameColumn * animation.frameWidth;
+			const sourceX = (animation.fromColumn + animator.frameIndex) * animation.frameWidth;
 			const sourceY = animation.row * animation.frameHeight;
-
-			const worldPosition = this.projection.toWorldCenter(position.row, position.column);
 
 			const screenPosition = this.camera.worldToScreen(worldPosition.x, worldPosition.y);
 
 			const destinationWidth = animation.frameWidth * this.camera.scale;
 			const destinationHeight = animation.frameHeight * this.camera.scale;
 
-			/*
-			 * The world position represents the center of the logical cell.
+			/**
+			 * WorldPosition represents the character's ground anchor.
+			 * The sprite is centered horizontally and extends upward from that
+			 * anchor.
 			 *
-			 * Character sprites are anchored by their bottom center so their
-			 * feet remain attached to that position regardless of frame size.
+			 * Sprite offsets remain visual-only and are scaled together with the
+			 * rest of the world.
 			 */
 			const destinationX =
 				screenPosition.x - destinationWidth / 2 + sprite.offsetX * this.camera.scale;
-
 			const destinationY =
 				screenPosition.y - destinationHeight + sprite.offsetY * this.camera.scale;
 
 			this.renderQueue.submit({
-				row: position.row,
-				column: position.column,
+				row: gridPosition.row,
+				column: gridPosition.column,
 				order: sprite.order,
 
 				execute: () => {

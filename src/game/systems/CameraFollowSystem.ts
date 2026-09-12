@@ -3,29 +3,21 @@
  * Path: src/game/systems/
  */
 
-import { System } from "e@ecs/System.js";
-
 import type { Camera } from "e@camera/Camera.js";
 import type { ECSManager } from "e@ecs/ECSManager.js";
-
-import { GridPosition } from "g@components/GridPosition.js";
+import { System } from "e@ecs/System.js";
 import { Player } from "g@components/Player.js";
-
-import type { IsometricProjection } from "g@render/IsometricProjection.js";
+import { WorldPosition } from "g@components/WorldPosition.js";
 
 /**
  * Keeps the shared camera centered on the player entity.
  *
- * The system locates the entity containing both Player and GridPosition
- * components, converts its logical grid position into the center anchor of the
- * corresponding isometric cell, and updates the camera position accordingly.
+ * Camera tracking uses the player's continuous WorldPosition rather than its
+ * discrete GridPosition. This allows the camera to follow smooth character
+ * movement without jumping between logical grid cells.
  *
- * Camera following is intentionally based on logical world position rather
- * than sprite dimensions or screen-space coordinates.
- *
- * The current implementation follows the player immediately. Interpolation,
- * dead zones, camera bounds, and other advanced behaviors are intentionally
- * deferred until gameplay requires them.
+ * The current game runtime expects a single Player entity. When no player with
+ * a WorldPosition exists, the camera remains unchanged.
  */
 export class CameraFollowSystem extends System {
 	/**
@@ -34,54 +26,34 @@ export class CameraFollowSystem extends System {
 	private readonly ecs: ECSManager;
 
 	/**
-	 * Shared camera controlled by this system.
+	 * Camera that follows the player's visual world-space position.
 	 */
 	private readonly camera: Camera;
 
 	/**
-	 * Shared isometric projection used to convert grid coordinates into world
-	 * coordinates.
-	 */
-	private readonly projection: IsometricProjection;
-
-	/**
 	 * Creates the required camera follow system.
 	 *
-	 * @param ecs - Shared ECS runtime containing the player entity.
+	 * @param ecs - Shared ECS runtime containing the player.
 	 * @param camera - Shared camera to position.
-	 * @param projection - Shared isometric projection.
 	 */
-	public constructor(ecs: ECSManager, camera: Camera, projection: IsometricProjection) {
+	public constructor(ecs: ECSManager, camera: Camera) {
 		super("update", "required");
 
 		this.ecs = ecs;
 		this.camera = camera;
-		this.projection = projection;
 	}
 
 	/**
-	 * Centers the camera on the current player grid position.
-	 *
-	 * If no player entity exists, the camera position remains unchanged.
-	 *
-	 * If multiple player entities exist, the first matching entity returned by
-	 * the ECS query is used. The game is expected to maintain a single Player
-	 * marker under normal runtime conditions.
+	 * Centers the camera on the player's continuous world-space position.
 	 */
 	public override update(): void {
-		const entities = this.ecs.query(Player, GridPosition);
-		const entity = entities[0];
-		if (entity === undefined) {
+		const players = this.ecs.query(Player, WorldPosition);
+		const player = players[0];
+		if (player === undefined) {
 			return;
 		}
 
-		const position = this.ecs.getComponent(entity, GridPosition);
-		if (!position) {
-			return;
-		}
-
-		const worldPosition = this.projection.toWorldCenter(position.row, position.column);
-
+		const worldPosition = this.ecs.getComponent(player, WorldPosition)!;
 		this.camera.setPosition(worldPosition.x, worldPosition.y);
 	}
 }
