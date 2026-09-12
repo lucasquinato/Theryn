@@ -6,17 +6,23 @@
 import { Camera } from "e@camera/Camera.js";
 import { CanvasManager } from "e@canvas/CanvasManager.js";
 import { SceneManager } from "e@controller/scene/SceneManager.js";
-import { LoaderManagerInstance } from "e@loader/LoaderManager.js";
 import { ECSManagerInstance } from "e@ecs/ECSManager.js";
+import { LoaderManagerInstance } from "e@loader/LoaderManager.js";
+import { RenderQueue } from "e@render/RenderQueue.js";
 
 import type { Theryn } from "e@types/global.d.ts";
+
+/**
+ * Shared render queue used by every rendering system in the engine runtime.
+ */
+const renderQueue = new RenderQueue();
 
 /**
  * Public API exposed by the Theryntile engine.
  *
  * Engine subsystems are composed here into a single application-wide API.
- * Shared runtime services, such as the ECS and loader, reuse their existing
- * instances so every subsystem operates against the same engine state.
+ * Shared runtime services reuse the same instances so every subsystem operates
+ * against the same engine state.
  */
 const TherynAPI: Theryn = {
 	/**
@@ -42,20 +48,26 @@ const TherynAPI: Theryn = {
 	ecs: ECSManagerInstance,
 
 	/**
+	 * Shared render queue used to collect and order deferred rendering
+	 * operations during each frame.
+	 */
+	renderQueue,
+
+	/**
 	 * Scene subsystem responsible for scene lifecycle and engine loop
 	 * coordination.
 	 *
-	 * The same ECS instance exposed publicly through Theryn.ecs is injected
-	 * into the SceneManager so scene execution and public ECS operations
-	 * operate against a single shared runtime.
+	 * The same ECS and render queue instances exposed publicly through the
+	 * Theryn API are injected into the SceneManager so frame execution operates
+	 * against one shared runtime.
 	 */
-	scene: new SceneManager(ECSManagerInstance),
+	scene: new SceneManager(ECSManagerInstance, renderQueue),
 };
 
 /**
  * Exposes the Theryntile engine API through the browser window.
  *
- * The global declaration in global.d.ts provides the corresponding
- * TypeScript type information for consumers of this API.
+ * The global declaration in global.d.ts provides the corresponding TypeScript
+ * type information for consumers of this API.
  */
 window.Theryn = TherynAPI;

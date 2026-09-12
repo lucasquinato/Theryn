@@ -12,7 +12,13 @@ Theryn.scene.register(new Lobby());
 Theryn.scene.register(new Forest());
 
 Theryn.ecs.registerSystem(
-	new RenderMapSystem(Theryn.ecs, Theryn.loader, Theryn.canvas.getCanvas("main"), Theryn.camera),
+	new RenderMapSystem(
+		Theryn.ecs,
+		Theryn.loader,
+		Theryn.canvas.getCanvas("main"),
+		Theryn.camera,
+		Theryn.renderQueue,
+	),
 );
 
 Theryn.scene.change(SceneData.lobby.name);

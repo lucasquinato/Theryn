@@ -23,6 +23,7 @@
 			"e@controller/*": ["./src/engine/controller/*"],
 			"e@ecs/*": ["./src/engine/ecs/*"],
 			"e@loader/*": ["./src/engine/loader/*"],
+			"e@render/*": ["./src/engine/render/*"],
 			"e@types/*": ["./src/engine/types/*"],
 
 			// Game

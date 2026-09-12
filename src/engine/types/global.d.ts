@@ -3,11 +3,12 @@
  * Path: src/engine/types/
  */
 
-import type { Camera } from "e@camera/Camera";
-import type { CanvasManager } from "e@canvas/CanvasManager";
-import type { LoaderManager } from "e@loader/LoaderManager";
-import type { SceneManager } from "e@controller/scene/SceneManager";
-import type { ECSManager } from "e@ecs/ECSManager";
+import type { Camera } from "e@camera/Camera.js";
+import type { CanvasManager } from "e@canvas/CanvasManager.js";
+import type { SceneManager } from "e@controller/scene/SceneManager.js";
+import type { ECSManager } from "e@ecs/ECSManager.js";
+import type { LoaderManager } from "e@loader/LoaderManager.js";
+import type { RenderQueue } from "e@render/RenderQueue.js";
 
 /**
  * Defines the public API exposed by the Theryntile engine.
@@ -46,6 +47,12 @@ export interface Theryn {
 	 * Shared ECS runtime responsible for entities, components, and systems.
 	 */
 	readonly ecs: ECSManager;
+
+	/**
+	 * Shared render queue responsible for collecting deferred rendering
+	 * commands and executing them using deterministic grid-based ordering.
+	 */
+	readonly renderQueue: RenderQueue;
 }
 
 /**

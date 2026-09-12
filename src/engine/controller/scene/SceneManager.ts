@@ -3,90 +3,80 @@
  * Path: src/engine/controller/scene/
  */
 
-import { Scene } from "e@controller/scene/Scene.js";
 import { LoopController } from "e@controller/LoopController.js";
-import { ECSManager } from "e@ecs/ECSManager.js";
+import { Scene } from "e@controller/scene/Scene.js";
+
+import type { ECSManager } from "e@ecs/ECSManager.js";
+import type { RenderQueue } from "e@render/RenderQueue.js";
 
 /**
- * Registers scenes, controls scene transitions, and coordinates execution
- * of the active scene and the shared ECS runtime through the engine loop.
+ * Coordinates scene registration, transitions, lifecycle execution, and the
+ * engine frame loop.
  *
- * The SceneManager owns the LoopController internally so game code does not
- * need to interact with frame scheduling directly.
+ * Scene-scoped systems are registered in the shared ECS runtime when their
+ * owning scene is registered. Their enabled state is then controlled
+ * automatically during scene transitions.
  *
- * A scene must be explicitly selected through change() before ready() can
- * start the engine loop. This allows the game bootstrap to determine the
- * correct initial scene according to runtime state instead of relying on an
- * implicit default.
- *
- * The engine loop remains active across scene transitions. Changing scenes
- * only replaces the active scene and coordinates the lifecycle of its
- * scene-scoped ECS systems.
+ * The manager also coordinates the shared render queue. Rendering operations
+ * submitted by scenes and ECS systems during a frame are collected first and
+ * executed only after every render producer has completed.
  */
 export class SceneManager {
 	/**
-	 * Internal controller responsible for scheduling engine frames.
-	 *
-	 * Loop execution is intentionally encapsulated by the SceneManager.
+	 * Animation loop used to drive scene updates and rendering.
 	 */
 	private readonly loopController = new LoopController();
 
 	/**
-	 * Registered scene instances indexed by their unique names.
+	 * Registered scenes indexed by their unique names.
 	 */
 	private readonly scenes = new Map<string, Scene>();
 
 	/**
-	 * Shared ECS runtime executed alongside the active scene.
-	 *
-	 * The same ECS instance is used across all scenes so required systems
-	 * remain alive while scene-scoped systems are activated and deactivated
-	 * during transitions.
+	 * Shared ECS runtime used to register and execute systems.
 	 */
 	private readonly ecs: ECSManager;
 
 	/**
-	 * Scene currently receiving lifecycle, update, and render calls.
-	 *
-	 * Remains null until a registered scene is explicitly selected through
-	 * change().
+	 * Shared render queue used to collect and execute deferred rendering
+	 * commands during each frame.
+	 */
+	private readonly renderQueue: RenderQueue;
+
+	/**
+	 * Scene currently active in the engine.
 	 */
 	private activeScene: Scene | null = null;
 
 	/**
-	 * Indicates whether the engine loop has already been started.
-	 *
-	 * Once ready() completes successfully, subsequent calls have no effect.
+	 * Indicates whether the scene manager has already started the engine loop.
 	 */
 	private isReady = false;
 
 	/**
-	 * Creates a scene manager bound to the shared ECS runtime.
+	 * Creates a scene manager connected to the shared engine runtime.
 	 *
-	 * @param ecs - ECS runtime executed alongside the active scene.
+	 * @param ecs - Shared ECS runtime used by registered scenes.
+	 * @param renderQueue - Shared render queue used during frame rendering.
 	 */
-	public constructor(ecs: ECSManager) {
+	public constructor(ecs: ECSManager, renderQueue: RenderQueue) {
 		this.ecs = ecs;
+		this.renderQueue = renderQueue;
 	}
 
 	/**
-	 * Registers a scene and its scene-scoped ECS systems.
+	 * Registers a scene and its scene-scoped systems.
 	 *
-	 * Registration makes the scene available for future transitions but does
-	 * not activate it or start the engine loop.
+	 * Scene systems are registered immediately but remain disabled until their
+	 * owning scene becomes active.
 	 *
-	 * Systems attached to the scene are registered in the shared ECS runtime
-	 * immediately. Because scene-scoped systems start disabled, they will not
-	 * execute until the scene becomes active.
+	 * @param scene - Scene to register.
 	 *
-	 * @param scene - Scene instance to register.
-	 *
-	 * @throws {Error} If another scene with the same name is already
-	 * registered.
+	 * @throws {Error} If another scene already uses the same name.
 	 */
 	public register(scene: Scene): void {
 		if (this.scenes.has(scene.name)) {
-			throw new Error(`Scene "${scene.name}" is already registered.`);
+			throw new Error(`Scene '${scene.name}' is already registered.`);
 		}
 
 		for (const system of scene.getSystems()) {
@@ -99,31 +89,26 @@ export class SceneManager {
 	/**
 	 * Changes the currently active scene.
 	 *
-	 * When leaving a scene, its scene-scoped ECS systems are disabled before
-	 * exit() is called. The target scene then becomes active, its systems are
-	 * enabled, and enter() is called.
+	 * Scene-scoped systems belonging to the previous scene are disabled before
+	 * its exit hook executes. Systems belonging to the next scene are enabled
+	 * before its enter hook executes.
 	 *
-	 * Required ECS systems are not affected by scene transitions and continue
-	 * to exist for the lifetime of the shared ECS runtime.
+	 * Required systems remain unaffected by scene transitions.
 	 *
-	 * Requesting the scene that is already active has no effect.
+	 * Changing to the currently active scene has no effect.
 	 *
-	 * Scene transitions may occur before or after the engine loop starts.
-	 * Changing scenes while the loop is running does not restart the
-	 * LoopController.
+	 * @param name - Name of the scene to activate.
 	 *
-	 * @param name - Name of the registered scene to activate.
-	 *
-	 * @throws {Error} If no scene is registered with the provided name.
+	 * @throws {Error} If the requested scene has not been registered.
 	 */
 	public change(name: string): void {
-		const scene = this.scenes.get(name);
+		const nextScene = this.scenes.get(name);
 
-		if (!scene) {
-			throw new Error(`Scene "${name}" is not registered.`);
+		if (!nextScene) {
+			throw new Error(`Scene '${name}' is not registered.`);
 		}
 
-		if (scene === this.activeScene) {
+		if (this.activeScene === nextScene) {
 			return;
 		}
 
@@ -135,7 +120,7 @@ export class SceneManager {
 			this.activeScene.exit();
 		}
 
-		this.activeScene = scene;
+		this.activeScene = nextScene;
 
 		for (const system of this.activeScene.getSystems()) {
 			this.ecs.enableSystem(system);
@@ -145,18 +130,11 @@ export class SceneManager {
 	}
 
 	/**
-	 * Marks scene setup as complete and starts the engine loop.
+	 * Starts the engine loop using the currently active scene.
 	 *
-	 * An active scene must already have been selected explicitly through
-	 * change(). The SceneManager intentionally does not choose a default scene
-	 * automatically.
+	 * Repeated calls after the manager has started have no effect.
 	 *
-	 * Once started, the same loop continues running across all subsequent
-	 * scene transitions.
-	 *
-	 * Repeated calls after a successful start have no effect.
-	 *
-	 * @throws {Error} If no active scene has been selected.
+	 * @throws {Error} If no scene is active when the manager is started.
 	 */
 	public ready(): void {
 		if (this.isReady) {
@@ -164,7 +142,7 @@ export class SceneManager {
 		}
 
 		if (!this.activeScene) {
-			throw new Error("Cannot start the scene loop without an active scene.");
+			throw new Error("Cannot start the scene manager without an active scene.");
 		}
 
 		this.isReady = true;
@@ -176,26 +154,39 @@ export class SceneManager {
 	}
 
 	/**
-	 * Executes the update phase for the current engine frame.
+	 * Executes the update phase for the active scene and shared ECS runtime.
 	 *
-	 * Scene-specific update logic runs first, followed by all enabled ECS
-	 * systems registered for the update phase.
-	 *
-	 * @param deltaTime - Time elapsed since the previous frame, in seconds.
+	 * @param deltaTime - Elapsed time since the previous frame in seconds.
 	 */
 	private update(deltaTime: number): void {
-		this.activeScene?.update(deltaTime);
+		if (!this.activeScene) {
+			return;
+		}
+
+		this.activeScene.update(deltaTime);
 		this.ecs.update(deltaTime);
 	}
 
 	/**
-	 * Executes the render phase for the current engine frame.
+	 * Executes the render phase for the active scene and shared ECS runtime.
 	 *
-	 * Scene-specific rendering runs first, followed by all enabled ECS
-	 * systems registered for the render phase.
+	 * The render queue is reset before producers begin submitting commands.
+	 * Scene and ECS rendering then populate the queue, which is flushed only
+	 * after every producer has completed.
+	 *
+	 * This guarantees that rendering order is determined globally rather than
+	 * by the order in which individual rendering systems execute.
 	 */
 	private render(): void {
-		this.activeScene?.render();
+		if (!this.activeScene) {
+			return;
+		}
+
+		this.renderQueue.clear();
+
+		this.activeScene.render();
 		this.ecs.render();
+
+		this.renderQueue.flush();
 	}
 }
