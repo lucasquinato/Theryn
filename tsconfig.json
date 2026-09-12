@@ -17,16 +17,20 @@
 		"paths": {
 			// Engine
 			"e@engine/*": ["./src/engine/*"],
-			"e@types/*": ["./src/engine/types/*"],
-			"e@config/*": ["./src/engine/config/*"],
 			"e@canvas/*": ["./src/engine/canvas/*"],
-			"e@loader/*": ["./src/engine/loader/*"],
+			"e@config/*": ["./src/engine/config/*"],
 			"e@controller/*": ["./src/engine/controller/*"],
+			"e@ecs/*": ["./src/engine/ecs/*"],
+			"e@loader/*": ["./src/engine/loader/*"],
+			"e@types/*": ["./src/engine/types/*"],
 
 			// Game
 			"g@game/*": ["./src/game/*"],
 			"g@assets/*": ["./src/game/assets/*"],
-			"g@scenes/*": ["./src/game/scenes/*"]
+			"g@scenes/*": ["./src/game/scenes/*"],
+			"g@components/*": ["./src/game/components/*"],
+			"g@maps/*": ["./src/game/maps/*"],
+			"g@systems/*": ["./src/game/systems/*"]
 		}
 	},
 	"include": ["src/**/*"],
