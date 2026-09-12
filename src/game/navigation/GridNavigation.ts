@@ -3,19 +3,18 @@
  * Path: src/game/navigation/
  */
 
-import { Tile } from "g@components/Tile.js";
-import { GridPosition } from "g@components/GridPosition.js";
-
 import type { ECSManager } from "e@ecs/ECSManager.js";
 import type { Entity } from "e@ecs/Entity.js";
-
+import { GridPosition } from "g@components/GridPosition.js";
+import { Tile } from "g@components/Tile.js";
 import type { TileRegistry } from "g@tiles/TileRegistry.js";
 
 /**
  * Provides shared spatial navigation rules for the logical game grid.
  *
- * GridNavigation centralizes tile walkability and cell occupancy checks used
- * by systems such as hover, selection, pathfinding, and movement.
+ * GridNavigation centralizes tile walkability, movement cost, and cell
+ * occupancy checks used by systems such as hover, selection, pathfinding, and
+ * movement range calculation.
  *
  * A navigable cell must contain exactly one layer-zero Tile entity whose tile
  * definition is marked as walkable. Additional entities sharing the same
@@ -31,7 +30,7 @@ export class GridNavigation {
 	private readonly ecs: ECSManager;
 
 	/**
-	 * Tile gameplay registry used to resolve walkability semantics.
+	 * Tile gameplay registry used to resolve navigation semantics.
 	 */
 	private readonly tiles: TileRegistry;
 
@@ -59,7 +58,39 @@ export class GridNavigation {
 	 * @returns `true` when the cell is valid for navigation.
 	 */
 	public isWalkable(row: number, column: number, ignoredEntity: Entity | null = null): boolean {
-		return this.getWalkableTile(row, column, ignoredEntity) !== null;
+		return this.getMovementCost(row, column, ignoredEntity) !== null;
+	}
+
+	/**
+	 * Resolves the movement cost required to enter a logical grid cell.
+	 *
+	 * Only navigable cells have a movement cost. The current navigation model
+	 * assigns a uniform cost of `1` to every walkable tile.
+	 *
+	 * Returning `null` indicates that the cell cannot be entered.
+	 *
+	 * This method defines the movement-cost contract consumed by navigation
+	 * algorithms. Tile-specific costs may be introduced later without changing
+	 * those consumers.
+	 *
+	 * @param row - Logical grid row.
+	 * @param column - Logical grid column.
+	 * @param ignoredEntity - Optional entity excluded from occupancy checks.
+	 *
+	 * @returns Movement cost for entering the cell, or `null` when blocked.
+	 */
+	public getMovementCost(
+		row: number,
+		column: number,
+		ignoredEntity: Entity | null = null,
+	): number | null {
+		const tile = this.getWalkableTile(row, column, ignoredEntity);
+
+		if (tile === null) {
+			return null;
+		}
+
+		return 1;
 	}
 
 	/**
@@ -95,7 +126,7 @@ export class GridNavigation {
 			return null;
 		}
 
-		const definition = this.tiles.get(tile.id);
+		const definition = this.tiles.get(tile.id)!;
 		if (!definition.walkable) {
 			return null;
 		}

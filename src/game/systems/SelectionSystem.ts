@@ -3,38 +3,36 @@
  * Path: src/game/systems/
  */
 
+import type { ECSManager } from "e@ecs/ECSManager.js";
 import { System } from "e@ecs/System.js";
-
+import type { MouseInput } from "e@input/mouse/MouseInput.js";
 import { GridPosition } from "g@components/GridPosition.js";
 import { Movement } from "g@components/Movement.js";
 import { Player } from "g@components/Player.js";
-
-import type { ECSManager } from "e@ecs/ECSManager.js";
-import type { MouseInput } from "e@input/mouse/MouseInput.js";
-
 import type { HoverState } from "g@interaction/HoverState.js";
 import type { SelectionState } from "g@interaction/SelectionState.js";
 import type { GridPathfinder } from "g@navigation/GridPathfinder.js";
+import type { MovementRangeState } from "g@navigation/MovementRangeState.js";
 
 /**
  * Handles interactive tile selection and starts player movement toward the
  * selected destination.
  *
- * A selection can only be created while the player is idle and an interactive
- * tile is currently hovered. The selected tile is converted into a navigation
- * path through GridPathfinder.
+ * A destination can only be selected while the player is idle, the tile is
+ * currently interactive, and the destination belongs to the player's active
+ * movement range.
  *
- * If no valid path exists, the selection is immediately discarded and
- * movement does not begin.
+ * The movement range acts as the authoritative cost-budget constraint while
+ * GridPathfinder resolves the concrete minimum-cost route used for traversal.
  */
 export class SelectionSystem extends System {
 	/**
-	 * Shared ECS runtime containing the player entity and movement components.
+	 * Shared ECS runtime containing the player entity.
 	 */
 	private readonly ecs: ECSManager;
 
 	/**
-	 * Mouse input used to detect tile selection clicks.
+	 * Mouse input used to detect destination selection clicks.
 	 */
 	private readonly mouse: MouseInput;
 
@@ -44,12 +42,19 @@ export class SelectionSystem extends System {
 	private readonly hover: HoverState;
 
 	/**
-	 * Shared selection state containing the current navigation destination.
+	 * Shared destination selection state.
 	 */
 	private readonly selection: SelectionState;
 
 	/**
-	 * Pathfinder used to resolve a navigable route to the selected tile.
+	 * Shared movement range containing destinations reachable within the
+	 * configured movement cost budget.
+	 */
+	private readonly range: MovementRangeState;
+
+	/**
+	 * Pathfinder used to resolve the concrete minimum-cost route to the
+	 * selected tile.
 	 */
 	private readonly pathfinder: GridPathfinder;
 
@@ -60,6 +65,7 @@ export class SelectionSystem extends System {
 	 * @param mouse - Mouse input source.
 	 * @param hover - Shared interactive hover state.
 	 * @param selection - Shared destination selection state.
+	 * @param range - Shared reachable movement range.
 	 * @param pathfinder - Grid pathfinder used to resolve movement routes.
 	 */
 	public constructor(
@@ -67,6 +73,7 @@ export class SelectionSystem extends System {
 		mouse: MouseInput,
 		hover: HoverState,
 		selection: SelectionState,
+		range: MovementRangeState,
 		pathfinder: GridPathfinder,
 	) {
 		super("update", "required");
@@ -75,11 +82,16 @@ export class SelectionSystem extends System {
 		this.mouse = mouse;
 		this.hover = hover;
 		this.selection = selection;
+		this.range = range;
 		this.pathfinder = pathfinder;
 	}
 
 	/**
 	 * Processes left mouse clicks while the player is idle.
+	 *
+	 * The clicked destination must belong to the current movement range and
+	 * the concrete path resolved by GridPathfinder must not exceed the minimum
+	 * movement cost previously calculated for that destination.
 	 */
 	public override update(): void {
 		if (!this.mouse.wasClicked(0)) {
@@ -96,16 +108,34 @@ export class SelectionSystem extends System {
 		}
 
 		const player = this.getPlayer();
+
 		if (player === null) {
 			return;
 		}
 
-		const movement = this.ecs.getComponent(player, Movement)!;
-		if (movement.active) {
+		const movement = this.ecs.getComponent(player, Movement);
+
+		if (movement === undefined || movement.active) {
 			return;
 		}
 
-		const position = this.ecs.getComponent(player, GridPosition)!;
+		const allowedCost = this.range.getCost(this.hover.row, this.hover.column);
+
+		console.log("Selection cost:", {
+			row: this.hover.row,
+			column: this.hover.column,
+			allowedCost,
+		});
+
+		if (allowedCost === null) {
+			return;
+		}
+
+		const position = this.ecs.getComponent(player, GridPosition);
+
+		if (position === undefined) {
+			return;
+		}
 
 		const path = this.pathfinder.findPath(
 			position.row,
@@ -115,20 +145,37 @@ export class SelectionSystem extends System {
 			player,
 		);
 
-		if (path.length === 0) {
+		console.log("Path result:", {
+			cost: path?.cost ?? null,
+			nodes: path?.nodes ?? [],
+		});
+
+		if (path === null || path.nodes.length === 0) {
+			this.selection.clear();
+			return;
+		}
+
+		/**
+		 * The movement range and pathfinder use the same navigation rules.
+		 * Therefore the resolved path should never exceed the minimum cost
+		 * calculated for the destination. This guard prevents movement when
+		 * those two navigation results become inconsistent.
+		 */
+		if (path.cost > allowedCost) {
 			this.selection.clear();
 			return;
 		}
 
 		this.selection.set(this.hover.entity, this.hover.row, this.hover.column);
 
-		movement.start(path, position.row, position.column);
+		movement.start(path.nodes, position.row, position.column);
 
 		/**
-		 * Interaction is disabled while movement is active, so the current
-		 * hover is cleared as soon as navigation begins.
+		 * Hover and movement-range interaction are unavailable while the player
+		 * traverses the selected path.
 		 */
 		this.hover.clear();
+		this.range.clear();
 
 		document.body.style.cursor = "default";
 	}
@@ -136,7 +183,7 @@ export class SelectionSystem extends System {
 	/**
 	 * Resolves the player entity controlled by tile selection.
 	 *
-	 * The current game runtime expects a single Player entity.
+	 * The current runtime expects a single Player entity.
 	 *
 	 * @returns The player entity, or `null` when none exists.
 	 */
