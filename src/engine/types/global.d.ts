@@ -3,6 +3,7 @@
  * Path: src/engine/types/
  */
 
+import type { Camera } from "e@camera/Camera";
 import type { CanvasManager } from "e@canvas/CanvasManager";
 import type { LoaderManager } from "e@loader/LoaderManager";
 import type { SceneManager } from "e@controller/scene/SceneManager";
@@ -16,6 +17,13 @@ import type { ECSManager } from "e@ecs/ECSManager";
  * same engine runtime.
  */
 export interface Theryn {
+	/**
+	 * Camera subsystem responsible for transforming world-space coordinates
+	 * into screen-space coordinates according to the current camera position,
+	 * viewport, and zoom level.
+	 */
+	readonly camera: Camera;
+
 	/**
 	 * Canvas subsystem responsible for creating, storing, and retrieving
 	 * application canvases.

@@ -3,6 +3,7 @@
  * Path: src/engine/
  */
 
+import { Camera } from "e@camera/Camera.js";
 import { CanvasManager } from "e@canvas/CanvasManager.js";
 import { SceneManager } from "e@controller/scene/SceneManager.js";
 import { LoaderManagerInstance } from "e@loader/LoaderManager.js";
@@ -18,6 +19,12 @@ import type { Theryn } from "e@types/global.d.ts";
  * instances so every subsystem operates against the same engine state.
  */
 const TherynAPI: Theryn = {
+	/**
+	 * Global camera used by rendering systems to transform world-space
+	 * coordinates into screen-space coordinates.
+	 */
+	camera: new Camera(),
+
 	/**
 	 * Canvas subsystem used to create, store, and retrieve application
 	 * canvases.

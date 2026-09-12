@@ -17,6 +17,7 @@
 		"paths": {
 			// Engine
 			"e@engine/*": ["./src/engine/*"],
+			"e@camera/*": ["./src/engine/camera/*"],
 			"e@canvas/*": ["./src/engine/canvas/*"],
 			"e@config/*": ["./src/engine/config/*"],
 			"e@controller/*": ["./src/engine/controller/*"],
@@ -27,9 +28,9 @@
 			// Game
 			"g@game/*": ["./src/game/*"],
 			"g@assets/*": ["./src/game/assets/*"],
-			"g@scenes/*": ["./src/game/scenes/*"],
 			"g@components/*": ["./src/game/components/*"],
 			"g@maps/*": ["./src/game/maps/*"],
+			"g@scenes/*": ["./src/game/scenes/*"],
 			"g@systems/*": ["./src/game/systems/*"]
 		}
 	},
