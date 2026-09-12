@@ -32,6 +32,7 @@
 			"g@components/*": ["./src/game/components/*"],
 			"g@maps/*": ["./src/game/maps/*"],
 			"g@scenes/*": ["./src/game/scenes/*"],
+			"g@render/*": ["./src/game/render/*"],
 			"g@systems/*": ["./src/game/systems/*"]
 		}
 	},
